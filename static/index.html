@@ -1,24 +1,95 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Video Downloader</title>
   <style>
-        .form-container {
-            width: 300px;
-            margin: 100px auto;
-            padding: 40px;
-            border: 2px solid #ccc;
-            background-color: #f9f9f9;
-        }
-    </style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+    label, input, button, select { display: block; width: 100%; margin: 10px 0; }
+    img { max-width: 100%; margin: 10px 0; }
+    .info-box { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; }
+  </style>
 </head>
 <body>
-  <div class="form-container">
-    <h1>Download Video (YouTube / Instagram)</h1>
-    <form action="/download" method="get">
-      <input type="text" name="url" placeholder="Paste video URL" size="50" required />
-      <button type="submit">Download MP4</button>
-    </form>    
-  </div>
+
+<h2>Download Video (YouTube / Instagram)</h2>
+
+<input type="url" id="urlInput" placeholder="Paste YouTube or Instagram URL" required>
+<select id="formatSelect">
+  <option value="video">Video (MP4)</option>
+</select>
+
+<button onclick="fetchInfo()">Fetch Info</button>
+
+<div id="infoBox" class="info-box" style="display:none;">
+  <img id="thumbnail" src="" alt="Thumbnail" />
+  <p><strong>Title:</strong> <span id="title"></span></p>
+  <p><strong>Duration:</strong> <span id="duration"></span> seconds</p>
+  <p><strong>Estimated size:</strong> <span id="size"></span></p>
+  <button onclick="startDownload()">Download</button>
+</div>
+
+<p id="message" style="color: red;"></p>
+
+<script>
+  let currentUrl = "";
+
+  function formatBytes(bytes) {
+    if (!bytes) return "Unknown";
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    let i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return parseFloat((bytes / Math.pow(1024, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function fetchInfo() {
+    const url = document.getElementById('urlInput').value.trim();
+    const msg = document.getElementById('message');
+    const infoBox = document.getElementById('infoBox');
+    msg.textContent = "";
+    infoBox.style.display = "none";
+
+    if (!url) {
+      msg.textContent = "Please enter a video URL.";
+      return;
+    }
+
+    fetch(`/info?url=${encodeURIComponent(url)}`)
+      .then(res => res.ok ? res.json() : res.text().then(t => Promise.reject(t)))
+      .then(data => {
+        currentUrl = url;
+        document.getElementById('title').textContent = data.title;
+        document.getElementById('duration').textContent = data.duration;
+        document.getElementById('size').textContent = formatBytes(data.filesize);
+        document.getElementById('thumbnail').src = data.thumbnail || "";
+        infoBox.style.display = "block";
+      })
+      .catch(err => {
+        msg.textContent = "Failed to get info: " + err;
+      });
+  }
+
+  function startDownload() {
+    const format = document.getElementById('formatSelect').value;
+    const msg = document.getElementById('message');
+    msg.textContent = "";
+
+    fetch(`/download?url=${encodeURIComponent(currentUrl)}&format=${format}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Download failed.");
+        return res.blob().then(blob => {
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = format === 'audio' ? 'download.mp3' : 'download.mp4';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        });
+      })
+      .catch(err => {
+        msg.textContent = err.message;
+      });
+  }
+</script>
+
 </body>
 </html>

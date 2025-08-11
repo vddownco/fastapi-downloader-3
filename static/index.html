@@ -1,95 +1,553 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Video Downloader</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
-    label, input, button, select { display: block; width: 100%; margin: 10px 0; }
-    img { max-width: 100%; margin: 10px 0; }
-    .info-box { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #3b7ad1;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-color: #e0e0e0;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .dark-mode {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #f4f4f4;
+            --border-color: #333;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+            color-scheme: dark;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 700px;
+            padding: 2.5rem;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            position: relative;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        p {
+            margin-bottom: 2rem;
+            font-size: 1rem;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+        .dark-mode p {
+            color: #ccc;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        #url-input {
+            flex-grow: 1;
+            padding: 0.8rem 1.2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+        
+        .dark-mode #url-input {
+             border-color: #555;
+        }
+
+        #url-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+        }
+
+        #fetch-btn {
+            padding: 0.8rem 1.5rem;
+            background-color: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #fetch-btn:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .loader {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            animation: spin 1s linear infinite;
+            display: none;
+            margin: auto;
+        }
+        
+        #download-loader {
+            display: none;
+            margin-top: 2rem;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        #download-loader .loader {
+            display: inline-block;
+            margin-right: 1rem;
+        }
+
+        #download-message {
+            display: inline-block;
+            color: var(--text-color);
+        }
+        
+        .error-message {
+            color: #d9534f;
+            font-weight: 600;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #video-info {
+            display: none;
+            margin-top: 2rem;
+            text-align: left;
+            border-top: 1px solid var(--border-color);
+            padding-top: 2rem;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .dark-mode #video-info {
+            border-color: #444;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #video-info h3 {
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        #video-details {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        #thumbnail {
+            width: 200px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        #video-text-details {
+            flex-grow: 1;
+        }
+        
+        #video-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+        }
+
+        #video-duration {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 1rem;
+        }
+
+        .formats-section {
+            margin-top: 1.5rem;
+        }
+        
+        .formats-section h4 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+        }
+
+        .format-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 1.2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .format-card:hover {
+            border-color: var(--primary-color);
+        }
+
+        .format-details {
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+        }
+
+        .format-details span:first-child {
+            font-weight: 600;
+        }
+        
+        .format-details span:last-child {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .format-download-btn {
+            background-color: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .format-download-btn:hover {
+            background-color: var(--secondary-color);
+        }
+
+        #error-message {
+            color: #d9534f;
+            margin-top: 1rem;
+            font-weight: 600;
+            display: none;
+        }
+
+        #dark-mode-toggle {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: var(--text-color);
+            transition: color 0.3s ease;
+        }
+
+        .dark-mode #dark-mode-toggle {
+            color: #f4f4f4;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            background-color: var(--border-color);
+            border-radius: 5px;
+            margin-top: 1rem;
+            overflow: hidden;
+            height: 10px;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: var(--primary-color);
+            transition: width 0.3s ease;
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <button id="dark-mode-toggle">🌙</button>
+        <h1>Video Downloader</h1>
+        <a href="http://harshvardhan.unaux.com" target="_blank" style="color: #4a90e2; font-size: larger;" >by Harsh Vardhan</a>
+        <p>Download YouTube(video, short) and Instagram(reel)</p>
+        
+        <div class="input-group">
+            <input type="text" id="url-input" placeholder="Paste a YouTube or Instagram video URL here...">
+            <button id="fetch-btn">Get Info</button>
+        </div>
 
-<h2>Download Video (YouTube / Instagram)</h2>
+        <div class="loader" id="info-loader"></div>
+        <div id="error-message"></div>
 
-<input type="url" id="urlInput" placeholder="Paste YouTube or Instagram URL" required>
-<select id="formatSelect">
-  <option value="video">Video (MP4)</option>
-</select>
+        <div id="video-info">
+            <h3>Video Details</h3>
+            <div id="video-details">
+                <img src="" alt="Thumbnail" id="thumbnail">
+                <div id="video-text-details">
+                    <div id="video-title"></div>
+                    <div id="video-duration"></div>
+                </div>
+            </div>
+            
+            <div class="formats-section">
+                <h4>Download Options</h4>
+                <div id="formats-container">
+                </div>
+            </div>
+        </div>
 
-<button onclick="fetchInfo()">Fetch Info</button>
+        <div id="download-loader">
+            <div class="loader"></div>
+            <span id="download-message"></span>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="download-progress-bar"></div>
+            </div>
+        </div>
+    </div>
 
-<div id="infoBox" class="info-box" style="display:none;">
-  <img id="thumbnail" src="" alt="Thumbnail" />
-  <p><strong>Title:</strong> <span id="title"></span></p>
-  <p><strong>Duration:</strong> <span id="duration"></span> seconds</p>
-  <p><strong>Estimated size:</strong> <span id="size"></span></p>
-  <button onclick="startDownload()">Download</button>
-</div>
+    <script>
+        const urlInput = document.getElementById('url-input');
+        const fetchBtn = document.getElementById('fetch-btn');
+        const infoLoader = document.getElementById('info-loader');
+        const downloadLoader = document.getElementById('download-loader');
+        const downloadMessage = document.getElementById('download-message');
+        const downloadProgressBar = document.getElementById('download-progress-bar');
+        const errorMessage = document.getElementById('error-message');
+        const videoInfo = document.getElementById('video-info');
+        const thumbnail = document.getElementById('thumbnail');
+        const videoTitle = document.getElementById('video-title');
+        const videoDuration = document.getElementById('video-duration');
+        const formatsContainer = document.getElementById('formats-container');
+        const darkModeToggle = document.getElementById('dark-mode-toggle');
 
-<p id="message" style="color: red;"></p>
+        // Dark mode logic
+        const toggleDarkMode = () => {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            darkModeToggle.textContent = isDarkMode ? '☀️' : '🌙';
+            localStorage.setItem('darkMode', isDarkMode);
+        };
+        
+        const isDarkModePreferred = localStorage.getItem('darkMode') === 'true';
+        if (isDarkModePreferred) {
+            toggleDarkMode();
+        } else {
+            darkModeToggle.textContent = '🌙';
+        }
+        darkModeToggle.addEventListener('click', toggleDarkMode);
 
-<script>
-  let currentUrl = "";
+        let eventSource = null;
 
-  function formatBytes(bytes) {
-    if (!bytes) return "Unknown";
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    let i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return parseFloat((bytes / Math.pow(1024, i)).toFixed(1)) + ' ' + sizes[i];
-  }
+        const startDownload = async (url, formatId) => {
+            showLoader(downloadLoader);
+            downloadMessage.textContent = 'Starting download...';
+            downloadProgressBar.style.width = '0%';
+            formatsContainer.style.pointerEvents = 'none';
 
-  function fetchInfo() {
-    const url = document.getElementById('urlInput').value.trim();
-    const msg = document.getElementById('message');
-    const infoBox = document.getElementById('infoBox');
-    msg.textContent = "";
-    infoBox.style.display = "none";
+            try {
+                const startResponse = await fetch(`/start-download?url=${encodeURIComponent(url)}&format_id=${formatId}`);
+                const data = await startResponse.json();
 
-    if (!url) {
-      msg.textContent = "Please enter a video URL.";
-      return;
-    }
+                if (!startResponse.ok) {
+                    throw new Error(data.detail || "Failed to start download.");
+                }
 
-    fetch(`/info?url=${encodeURIComponent(url)}`)
-      .then(res => res.ok ? res.json() : res.text().then(t => Promise.reject(t)))
-      .then(data => {
-        currentUrl = url;
-        document.getElementById('title').textContent = data.title;
-        document.getElementById('duration').textContent = data.duration;
-        document.getElementById('size').textContent = formatBytes(data.filesize);
-        document.getElementById('thumbnail').src = data.thumbnail || "";
-        infoBox.style.display = "block";
-      })
-      .catch(err => {
-        msg.textContent = "Failed to get info: " + err;
-      });
-  }
+                const downloadId = data.download_id;
+                
+                // Start the real-time progress stream using the download_id
+                eventSource = new EventSource(`/stream-progress/${downloadId}`);
+                
+                eventSource.onmessage = function(event) {
+                    const message = event.data;
+                    
+                    if (message.startsWith("ERROR:")) {
+                        showError(message.substring(6));
+                        eventSource.close();
+                        hideLoader(downloadLoader);
+                        return;
+                    }
+                    
+                    if (message === "Download complete!") {
+                        downloadProgressBar.style.width = '100%';
+                        downloadMessage.textContent = 'Download complete! Redirecting to file...';
+                        eventSource.close();
+                        // Trigger the actual file download
+                        window.location.href = `/get-file/${downloadId}`;
+                        
+                        setTimeout(() => {
+                           hideLoader(downloadLoader);
+                        }, 3000); 
+                        return;
+                    }
 
-  function startDownload() {
-    const format = document.getElementById('formatSelect').value;
-    const msg = document.getElementById('message');
-    msg.textContent = "";
+                    downloadMessage.textContent = message;
 
-    fetch(`/download?url=${encodeURIComponent(currentUrl)}&format=${format}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Download failed.");
-        return res.blob().then(blob => {
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = format === 'audio' ? 'download.mp3' : 'download.mp4';
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
+                    const match = message.match(/(\d+\.\d+)%/);
+                    if (match) {
+                        const realProgress = parseFloat(match[1]);
+                        if (!isNaN(realProgress)) {
+                            downloadProgressBar.style.width = `${realProgress}%`;
+                        }
+                    }
+                };
+
+                eventSource.onerror = function(err) {
+                    console.error("EventSource failed:", err);
+                    if (eventSource.readyState === EventSource.CLOSED) {
+                        return; // Handle clean closure gracefully
+                    }
+                    showError("An unexpected error occurred during the download.");
+                    eventSource.close();
+                    hideLoader(downloadLoader);
+                };
+
+            } catch (error) {
+                showError(error.message);
+                hideLoader(downloadLoader);
+            }
+        };
+
+        function hideLoader(loaderElement) {
+            loaderElement.style.display = 'none';
+            fetchBtn.disabled = false;
+            formatsContainer.style.pointerEvents = 'auto';
+        }
+        
+        function showLoader(loaderElement) {
+            loaderElement.style.display = 'block';
+            fetchBtn.disabled = true;
+        }
+
+        fetchBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            if (!url) {
+                showError("Please enter a URL.");
+                return;
+            }
+            try {
+                new URL(url);
+            } catch (e) {
+                showError("Please enter a valid URL.");
+                return;
+            }
+
+            showLoader(infoLoader);
+            clearInfo();
+            
+            try {
+                const response = await fetch(`/info?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Failed to get video info.");
+                }
+                displayVideoInfo(data);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideLoader(infoLoader);
+            }
         });
-      })
-      .catch(err => {
-        msg.textContent = err.message;
-      });
-  }
-</script>
 
+        function displayVideoInfo(data) {
+            thumbnail.src = data.thumbnail;
+            videoTitle.textContent = data.title;
+            if (data.duration) {
+                videoDuration.textContent = `Duration: ${formatDuration(data.duration)}`;
+            } else {
+                videoDuration.textContent = 'Duration: N/A';
+            }
+
+            formatsContainer.innerHTML = '';
+            if (data.formats && data.formats.length > 0) {
+                data.formats.forEach(format => {
+                    const formatCard = document.createElement('div');
+                    formatCard.className = 'format-card';
+                    
+                    const formatDetails = document.createElement('div');
+                    formatDetails.className = 'format-details';
+
+                    let fileSizeText = format.filesize ? `Approx. Size: ${formatFileSize(format.filesize)}` : 'Size: N/A';
+                    
+                    formatDetails.innerHTML = `
+                        <span>${format.label}</span>
+                        <span>${fileSizeText}</span>
+                    `;
+
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'format-download-btn';
+                    downloadBtn.textContent = 'Download';
+                    downloadBtn.onclick = () => {
+                        startDownload(urlInput.value, format.id);
+                    };
+
+                    formatCard.appendChild(formatDetails);
+                    formatCard.appendChild(downloadBtn);
+                    formatsContainer.appendChild(formatCard);
+                });
+            } else {
+                formatsContainer.innerHTML = '<p>No download formats available.</p>';
+            }
+
+            videoInfo.style.display = 'block';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds || seconds <= 0) return 'N/A';
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.round(seconds % 60);
+            return `${minutes} min ${remainingSeconds} sec`;
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function clearInfo() {
+            errorMessage.style.display = 'none';
+            videoInfo.style.display = 'none';
+        }
+    </script>
 </body>
 </html>

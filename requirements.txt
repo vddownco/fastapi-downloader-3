@@ -13,3 +13,4 @@ typing-inspection==0.4.1
 typing_extensions==4.14.1
 uvicorn==0.35.0
 yt-dlp==2025.7.21
+instaloader==4.8.2

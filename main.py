@@ -41,6 +41,7 @@ L = None
 async def startup_event():
     """Startup event to create Instaloader instance"""
     global L
+    # Instantiate Instaloader to use the session file for authentication
     L = instaloader.Instaloader(
         dirname_pattern=os.path.join(TEMP_DIR, '{profile}-{download_id}'),
         download_videos=True,
@@ -50,7 +51,16 @@ async def startup_event():
         save_metadata=False,
         post_metadata_txt_pattern=''
     )
-    L.load_session_from_file("YOUR_USERNAME", "iwillfollow1million.session")
+
+    # Load the session from the file. The filename should match what you uploaded to Render.
+    try:
+        L.load_session_from_file('iwillfollow1million', 'iwillfollow1million.session')
+        print("Instaloader session loaded successfully!")
+    except FileNotFoundError:
+        print("Instaloader session file not found. Instagram downloads may fail.")
+    except Exception as e:
+        print(f"Error loading Instaloader session: {e}")
+
 
 @app.on_event("shutdown")
 def cleanup_temp_dir():

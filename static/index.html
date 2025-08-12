@@ -108,6 +108,11 @@
         #fetch-btn:hover {
             background-color: var(--secondary-color);
         }
+        
+        #fetch-btn:disabled {
+            background-color: #888;
+            cursor: not-allowed;
+        }
 
         .loader {
             border: 4px solid var(--border-color);
@@ -255,28 +260,10 @@
         .format-download-btn:hover {
             background-color: var(--secondary-color);
         }
-
-        #error-message {
-            color: #d9534f;
-            margin-top: 1rem;
-            font-weight: 600;
-            display: none;
-        }
-
-        #dark-mode-toggle {
-            position: absolute;
-            top: 1.5rem;
-            right: 1.5rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.5rem;
-            color: var(--text-color);
-            transition: color 0.3s ease;
-        }
-
-        .dark-mode #dark-mode-toggle {
-            color: #f4f4f4;
+        
+        .format-download-btn:disabled {
+            background-color: #888;
+            cursor: not-allowed;
         }
         
         .progress-bar-container {
@@ -294,6 +281,71 @@
             background-color: var(--primary-color);
             transition: width 0.3s ease;
         }
+        
+        #dark-mode-toggle {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: var(--text-color);
+            transition: color 0.3s ease;
+        }
+        .dark-mode #dark-mode-toggle {
+            color: #f4f4f4;
+        }
+        
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 1000;
+        }
+
+        .toast {
+            background-color: #d9534f;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            margin-top: 1rem;
+            animation: slideIn 0.5s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+            display: flex;
+            align-items: center;
+        }
+        .toast.success {
+            background-color: #5cb85c;
+        }
+        .toast.info {
+            background-color: #5bc0de;
+        }
+        
+        .toast-icon {
+            margin-right: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .toast-close {
+            margin-left: 1rem;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -304,17 +356,16 @@
         <p>Download YouTube(video, short) and Instagram(reel)</p>
         
         <div class="input-group">
-            <input type="text" id="url-input" placeholder="Paste a YouTube or Instagram video URL here...">
+            <label for="url-input" class="sr-only">Video URL</label>
+            <input type="text" id="url-input" placeholder="Paste a YouTube or Instagram video URL here..." aria-label="Enter video URL">
             <button id="fetch-btn">Get Info</button>
         </div>
 
         <div class="loader" id="info-loader"></div>
-        <div id="error-message"></div>
-
         <div id="video-info">
             <h3>Video Details</h3>
             <div id="video-details">
-                <img src="" alt="Thumbnail" id="thumbnail">
+                <img src="" alt="Video thumbnail" id="thumbnail">
                 <div id="video-text-details">
                     <div id="video-title"></div>
                     <div id="video-duration"></div>
@@ -336,6 +387,7 @@
             </div>
         </div>
     </div>
+    <div class="toast-container"></div>
 
     <script>
         const urlInput = document.getElementById('url-input');
@@ -344,22 +396,20 @@
         const downloadLoader = document.getElementById('download-loader');
         const downloadMessage = document.getElementById('download-message');
         const downloadProgressBar = document.getElementById('download-progress-bar');
-        const errorMessage = document.getElementById('error-message');
         const videoInfo = document.getElementById('video-info');
         const thumbnail = document.getElementById('thumbnail');
         const videoTitle = document.getElementById('video-title');
         const videoDuration = document.getElementById('video-duration');
         const formatsContainer = document.getElementById('formats-container');
         const darkModeToggle = document.getElementById('dark-mode-toggle');
+        const toastContainer = document.querySelector('.toast-container');
 
         // Dark mode logic
         const toggleDarkMode = () => {
-            document.body.classList.toggle('dark-mode');
-            const isDarkMode = document.body.classList.contains('dark-mode');
-            darkModeToggle.textContent = isDarkMode ? '☀️' : '🌙';
-            localStorage.setItem('darkMode', isDarkMode);
+            const isDark = document.body.classList.toggle('dark-mode');
+            darkModeToggle.textContent = isDark ? '☀️' : '🌙';
+            localStorage.setItem('darkMode', isDark);
         };
-        
         const isDarkModePreferred = localStorage.getItem('darkMode') === 'true';
         if (isDarkModePreferred) {
             toggleDarkMode();
@@ -370,12 +420,41 @@
 
         let eventSource = null;
 
+        const toggleUIState = (isLoading, element) => {
+            if (isLoading) {
+                element.style.display = 'block';
+                fetchBtn.disabled = true;
+                formatsContainer.style.pointerEvents = 'none';
+            } else {
+                element.style.display = 'none';
+                fetchBtn.disabled = false;
+                formatsContainer.style.pointerEvents = 'auto';
+            }
+        };
+
+        const showToast = (message, type = 'error') => {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icon = type === 'success' ? '✅' : type === 'info' ? 'ℹ️' : '⚠️';
+            toast.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span><button class="toast-close">&times;</button>`;
+            toastContainer.appendChild(toast);
+            
+            toast.querySelector('.toast-close').addEventListener('click', () => {
+                toast.remove();
+            });
+
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 5000);
+        };
+
         const startDownload = async (url, formatId) => {
-            showLoader(downloadLoader);
+            toggleUIState(true, downloadLoader);
             downloadMessage.textContent = 'Starting download...';
             downloadProgressBar.style.width = '0%';
-            formatsContainer.style.pointerEvents = 'none';
-
+            
             try {
                 const startResponse = await fetch(`/start-download?url=${encodeURIComponent(url)}&format_id=${formatId}`);
                 const data = await startResponse.json();
@@ -386,16 +465,16 @@
 
                 const downloadId = data.download_id;
                 
-                // Start the real-time progress stream using the download_id
+                if (eventSource) eventSource.close();
                 eventSource = new EventSource(`/stream-progress/${downloadId}`);
                 
                 eventSource.onmessage = function(event) {
                     const message = event.data;
                     
                     if (message.startsWith("ERROR:")) {
-                        showError(message.substring(6));
+                        showToast(message.substring(6));
                         eventSource.close();
-                        hideLoader(downloadLoader);
+                        toggleUIState(false, downloadLoader);
                         return;
                     }
                     
@@ -403,11 +482,11 @@
                         downloadProgressBar.style.width = '100%';
                         downloadMessage.textContent = 'Download complete! Redirecting to file...';
                         eventSource.close();
-                        // Trigger the actual file download
                         window.location.href = `/get-file/${downloadId}`;
                         
                         setTimeout(() => {
-                           hideLoader(downloadLoader);
+                           toggleUIState(false, downloadLoader);
+                           showToast("Download started!", "success");
                         }, 3000); 
                         return;
                     }
@@ -426,44 +505,33 @@
                 eventSource.onerror = function(err) {
                     console.error("EventSource failed:", err);
                     if (eventSource.readyState === EventSource.CLOSED) {
-                        return; // Handle clean closure gracefully
+                        return;
                     }
-                    showError("An unexpected error occurred during the download.");
+                    showToast("An unexpected error occurred during the download.");
                     eventSource.close();
-                    hideLoader(downloadLoader);
+                    toggleUIState(false, downloadLoader);
                 };
 
             } catch (error) {
-                showError(error.message);
-                hideLoader(downloadLoader);
+                showToast(error.message);
+                toggleUIState(false, downloadLoader);
             }
         };
-
-        function hideLoader(loaderElement) {
-            loaderElement.style.display = 'none';
-            fetchBtn.disabled = false;
-            formatsContainer.style.pointerEvents = 'auto';
-        }
-        
-        function showLoader(loaderElement) {
-            loaderElement.style.display = 'block';
-            fetchBtn.disabled = true;
-        }
 
         fetchBtn.addEventListener('click', async () => {
             const url = urlInput.value.trim();
             if (!url) {
-                showError("Please enter a URL.");
+                showToast("Please enter a URL.");
                 return;
             }
             try {
                 new URL(url);
             } catch (e) {
-                showError("Please enter a valid URL.");
+                showToast("Please enter a valid URL.");
                 return;
             }
 
-            showLoader(infoLoader);
+            toggleUIState(true, infoLoader);
             clearInfo();
             
             try {
@@ -475,9 +543,9 @@
                 }
                 displayVideoInfo(data);
             } catch (error) {
-                showError(error.message);
+                showToast(error.message);
             } finally {
-                hideLoader(infoLoader);
+                toggleUIState(false, infoLoader);
             }
         });
 
@@ -539,16 +607,9 @@
             return `${minutes} min ${remainingSeconds} sec`;
         }
         
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-        }
-
         function clearInfo() {
-            errorMessage.style.display = 'none';
             videoInfo.style.display = 'none';
         }
     </script>
-    
 </body>
 </html>

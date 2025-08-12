@@ -7,6 +7,7 @@ import instaloader
 import queue
 import uuid
 import threading
+import re
 from fastapi import FastAPI, Query, HTTPException, BackgroundTasks, status
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,24 +26,31 @@ app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 TEMP_DIR = tempfile.mkdtemp()
 print(f"Temporary directory created at: {TEMP_DIR}")
 
-# Use an environment variable for the ffmpeg path
-FFMPEG_PATH = "/Applications/ffmpeg/ffmpeg"  # Updated to absolute path
+# Use an environment variable for the ffmpeg path for better portability and security
+FFMPEG_PATH = "/Applications/ffmpeg/ffmpeg"
 
 # A dictionary to hold progress queues for each unique download session
 PROGRESS_QUEUES: Dict[str, queue.Queue] = {}
 DOWNLOAD_FILES: Dict[str, str] = {}
 DOWNLOAD_LOCKS: Dict[str, threading.Lock] = {}
 
-# Instaloader setup (assuming public profile access, login required for private content)
-L = instaloader.Instaloader(
-    dirname_pattern=os.path.join(TEMP_DIR, '{profile}-{download_id}'),
-    download_videos=True,
-    download_pictures=False,
-    download_geotags=False,
-    download_comments=False,
-    save_metadata=False,
-    post_metadata_txt_pattern=''
-)
+# Instaloader setup (will be instantiated per-download for isolation)
+L = None
+
+@app.on_event("startup")
+async def startup_event():
+    """Startup event to create Instaloader instance"""
+    global L
+    L = instaloader.Instaloader(
+        dirname_pattern=os.path.join(TEMP_DIR, '{profile}-{download_id}'),
+        download_videos=True,
+        download_pictures=False,
+        download_geotags=False,
+        download_comments=False,
+        save_metadata=False,
+        post_metadata_txt_pattern=''
+    )
+    L.load_session_from_file("YOUR_USERNAME", "iwillfollow1million.session")
 
 @app.on_event("shutdown")
 def cleanup_temp_dir():
@@ -68,7 +76,6 @@ def run_sync_in_threadpool(func, *args, **kwargs):
     loop = asyncio.get_event_loop()
     return loop.run_in_executor(None, func, *args, **kwargs)
 
-# Progress hook for yt-dlp to update the specific queue
 def ytdlp_progress_hook(d: Dict[str, Any], download_id: str):
     """
     yt-dlp download progress ke liye hook.
@@ -80,13 +87,9 @@ def ytdlp_progress_hook(d: Dict[str, Any], download_id: str):
 
     if d['status'] == 'downloading':
         p = d.get('_percent_str', 'N/A')
-        # Remove ANSI escape sequences like [0m from progress string
-        import re
-        # Improved regex to remove all ANSI escape sequences
         p = re.sub(r'\x1b\[[0-9;]*[mGKHF]', '', p)
         total = d.get('_total_bytes_str', 'N/A')
         speed = d.get('_speed_str', 'N/A')
-        # Replace MiB with MB for better readability
         total = total.replace('MiB', 'MB')
         speed = speed.replace('MiB', 'MB')
         message = f"Downloading: {p} of {total} "
@@ -119,37 +122,34 @@ async def get_video_info(url: str = Query(..., description="Video URL")):
     
     available_formats = []
 
-    if platform == "youtube" or platform == "instagram":
-        if 'formats' in info_dict:
-            # Filter to include only mp4 for video and mp3/m4a for audio
-            for f in info_dict['formats']:
-                ext = f.get('ext', '').lower()
-                if ext == 'mp4' or ext == 'mp3' or ext == 'm4a':
-                    label = ""
-                    if ext == 'mp4':
-                        label = f"MP4 Video ({f.get('height', 'unknown')}p)" if f.get('height') else "MP4 Video (Best Quality)"
-                    elif ext == 'm4a' or ext == 'mp3':
-                        label = f"MP3 Audio ({f.get('abr', 'unknown')}kbps)"
-                    filesize = f.get('filesize') or f.get('filesize_approx')
-                    available_formats.append({
-                        "id": f.get('format_id', 'best'),
-                        "label": label,
-                        "ext": ext,
-                        "filesize": filesize
-                    })
-        else:
-            available_formats.append({
-                "id": "best",
-                "label": "MP4 Video (Best Quality)",
-                "ext": "mp4",
-                "filesize": None
-            })
+    if 'formats' in info_dict:
+        for f in info_dict['formats']:
+            ext = f.get('ext', '').lower()
+            if 'acodec' in f and 'vcodec' in f:  # Combined video/audio
+                label = f"MP4 Video ({f.get('height', 'unknown')}p)" if f.get('height') else "MP4 Video (Best Quality)"
+                filesize = f.get('filesize') or f.get('filesize_approx')
+                available_formats.append({
+                    "id": f.get('format_id', 'best'),
+                    "label": label,
+                    "ext": ext,
+                    "filesize": filesize
+                })
+            elif 'acodec' in f and f['acodec'] != 'none':  # Audio only
+                label = f"M4A Audio ({f.get('abr', 'unknown')}kbps)"
+                filesize = f.get('filesize') or f.get('filesize_approx')
+                available_formats.append({
+                    "id": f.get('format_id', 'bestaudio'),
+                    "label": label,
+                    "ext": 'm4a',
+                    "filesize": filesize
+                })
     else:
+        # Fallback for simple cases, e.g., Instagram reels
         available_formats.append({
             "id": "best",
             "label": "MP4 Video (Best Quality)",
             "ext": "mp4",
-            "filesize": None
+            "filesize": info_dict.get('filesize')
         })
 
     return {
@@ -174,10 +174,8 @@ def download_with_yt_dlp(url: str, format_id: str, download_id: str, temp_dir_pa
     }
     
     if platform == "youtube":
-        # Use best combined format if available, else fallback
-        options['format'] = f'{format_id}+bestaudio/best' if format_id != 'best' else 'bestvideo+bestaudio/best'
+        options['format'] = format_id if format_id else 'bestvideo+bestaudio/best'
     elif platform == "instagram":
-        # Use best combined format for Instagram
         options['format'] = 'best'
     else:
         options['format'] = 'best'
@@ -203,15 +201,12 @@ async def start_download(
     """
     download_id = str(uuid.uuid4())
     
-    # Har download ke liye alag temp directory banayein
     download_temp_dir = os.path.join(TEMP_DIR, download_id)
     os.makedirs(download_temp_dir, exist_ok=True)
 
-    # Har download ke liye alag queue aur lock banayein
     PROGRESS_QUEUES[download_id] = queue.Queue()
     DOWNLOAD_LOCKS[download_id] = threading.Lock()
 
-    # Download process ko background thread mein shuru karein
     asyncio.get_event_loop().run_in_executor(
         None, download_with_yt_dlp, url, format_id, download_id, download_temp_dir
     )
@@ -227,16 +222,14 @@ async def progress_streamer(download_id: str):
 
     while True:
         try:
-            message = download_queue.get(timeout=300) # 5 minutes timeout
+            message = download_queue.get(timeout=300)
             yield f"data: {message}\n\n"
             if message.startswith("ERROR:") or message == "Download complete!":
                 break
         except queue.Empty:
-            # Send a keep-alive message to prevent timeout
             yield "data: KEEP_ALIVE\n\n"
         await asyncio.sleep(1)
 
-    # Cleanup once download is complete or failed
     del PROGRESS_QUEUES[download_id]
     if download_id in DOWNLOAD_LOCKS:
         del DOWNLOAD_LOCKS[download_id]
@@ -258,11 +251,9 @@ async def get_downloaded_file(download_id: str, background_tasks: BackgroundTask
     if not filepath or not os.path.exists(filepath):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File path not valid.")
 
-    # File ka folder delete karein, jismein saari files hain
     download_temp_dir = os.path.dirname(filepath)
     background_tasks.add_task(shutil.rmtree, download_temp_dir, ignore_errors=True)
     
-    # DOWNLOAD_FILES se entry ko bhi saaf kar dein
     del DOWNLOAD_FILES[download_id]
 
     return FileResponse(
@@ -270,4 +261,3 @@ async def get_downloaded_file(download_id: str, background_tasks: BackgroundTask
         media_type="application/octet-stream",
         filename=os.path.basename(filepath)
     )
-    

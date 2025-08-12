@@ -27,40 +27,23 @@ TEMP_DIR = tempfile.mkdtemp()
 print(f"Temporary directory created at: {TEMP_DIR}")
 
 # Use an environment variable for the ffmpeg path for better portability and security
-FFMPEG_PATH = "/Applications/ffmpeg/ffmpeg"
+FFMPEG_PATH = os.environ.get("FFMPEG_PATH", "ffmpeg")
 
 # A dictionary to hold progress queues for each unique download session
 PROGRESS_QUEUES: Dict[str, queue.Queue] = {}
 DOWNLOAD_FILES: Dict[str, str] = {}
 DOWNLOAD_LOCKS: Dict[str, threading.Lock] = {}
 
-# Instaloader setup (will be instantiated per-download for isolation)
-L = None
-
-@app.on_event("startup")
-async def startup_event():
-    """Startup event to create Instaloader instance"""
-    global L
-    # Instantiate Instaloader to use the session file for authentication
-    L = instaloader.Instaloader(
-        dirname_pattern=os.path.join(TEMP_DIR, '{profile}-{download_id}'),
-        download_videos=True,
-        download_pictures=False,
-        download_geotags=False,
-        download_comments=False,
-        save_metadata=False,
-        post_metadata_txt_pattern=''
-    )
-
-    # Load the session from the file. The filename should match what you uploaded to Render.
-    try:
-        L.load_session_from_file('iwillfollow1million', 'iwillfollow1million.session')
-        print("Instaloader session loaded successfully!")
-    except FileNotFoundError:
-        print("Instaloader session file not found. Instagram downloads may fail.")
-    except Exception as e:
-        print(f"Error loading Instaloader session: {e}")
-
+# Instaloader setup
+L = instaloader.Instaloader(
+    dirname_pattern=os.path.join(TEMP_DIR, '{profile}-{download_id}'),
+    download_videos=True,
+    download_pictures=False,
+    download_geotags=False,
+    download_comments=False,
+    save_metadata=False,
+    post_metadata_txt_pattern=''
+)
 
 @app.on_event("shutdown")
 def cleanup_temp_dir():

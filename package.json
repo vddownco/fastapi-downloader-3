@@ -1,0 +1,12 @@
+{
+  "name": "video-downloader",
+  "version": "1.0.0",
+  "description": "Video Downloader FastAPI Application",
+  "scripts": {
+    "build": "echo 'Building static files...' && mkdir -p dist && cp -r static/* dist/",
+    "start": "python -m uvicorn main:app --host 0.0.0.0 --port 8000"
+  },
+  "keywords": ["fastapi", "video-downloader", "python"],
+  "author": "Harsh Vardhan",
+  "license": "MIT"
+}
